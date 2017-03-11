@@ -1,2 +1,3 @@
-# scripts
-Some useful shell scripts for Windows.
+# scripts-and-settings
+
+Some useful scripts for Windows and settings for apps.
