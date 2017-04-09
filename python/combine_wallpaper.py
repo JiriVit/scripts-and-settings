@@ -20,7 +20,9 @@ IMG2_WIDTH = 1280
 IMG2_HEIGHT = 1024
 
 def combine(input_dir='.', output_dir='.'):
-    """Combines two images of required sizes and saves it as new image."""
+    """Combines two images of required sizes and saves it as new image.
+    Returns tuplet (resultcode, output_filename).
+    """
     img1 = None
     img2 = None
 
@@ -39,8 +41,7 @@ def combine(input_dir='.', output_dir='.'):
             if img1 is not None and img2 is not None:
                 break
     if img1 is None or img2 is None:
-        print("ERROR: Couldn't find images of required sizes.")
-        sys.exit(1)
+        return (False, None)
 
     # create new image by combining the original ones
     output_img = Image.new('RGB', (IMG1_WIDTH + IMG2_WIDTH, max(IMG1_HEIGHT, IMG2_HEIGHT)))
@@ -50,12 +51,28 @@ def combine(input_dir='.', output_dir='.'):
     # save new image to a file
     output_img_filename = str.format('{0}_{1}.jpg', os.path.splitext(img1_filename)[0],
                                      os.path.splitext(img2_filename)[0])
-    output_img_filename = os.path.join(output_dir, output_img_filename)
-    output_img.save(output_img_filename, 'jpeg', quality=95)
+    output_img_filepath = os.path.join(output_dir, output_img_filename)
+    output_img.save(output_img_filepath, 'jpeg', quality=95)
+
+    return (True, output_img_filename)
 
 def main():
     """Do the script's main job."""
-    combine()
+    if len(sys.argv) > 1 and sys.argv[1] == 'folders':
+        list_filenames = os.listdir()
+        for item in list_filenames:
+            if not os.path.isfile(item):
+                (result, filename) = combine(item)
+                if result:
+                    print(str.format('{0}: created file \'{1}\'', item, filename))
+                else:
+                    print(str.format('{0}: nothing created', item))
+    else:
+        result = combine()
+        if result:
+            print(str.format('Created file \'{0}\'', filename))
+        else:
+            print('ERROR: Couldn\'t find usable source images for dual wallpaper.')
 
 if __name__ == '__main__':
     main()
