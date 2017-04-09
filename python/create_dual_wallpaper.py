@@ -1,4 +1,4 @@
-"""Combines two images into one wallpaper image.
+"""Creates dual monitor wallpaper by combining two single images.
 
 This script requires PIL module. Nowadays it is distributed as part of Pillow package. You install
 it just by entering:
@@ -68,7 +68,7 @@ def main():
                 else:
                     print(str.format('{0}: nothing created', item))
     else:
-        result = combine()
+        (result, filename) = combine()
         if result:
             print(str.format('Created file \'{0}\'', filename))
         else:
