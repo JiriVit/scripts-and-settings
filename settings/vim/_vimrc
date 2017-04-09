@@ -10,6 +10,8 @@ behave xterm
 :set tabstop=4
 :set nobackup
 au GUIEnter * simalt ~x
+" do not keep .un~ files
+:set noundofile
 
 set diffexpr=MyDiff()
 function MyDiff()
