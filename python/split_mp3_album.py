@@ -14,6 +14,10 @@ Pre-requisites:
 
 Recommended YouTube to MP3 Converter:
 y2mate.is
+
+TODO Add writing of artist, album and cover art to the ID3 tag. This will require use of an input
+     definition file (because command line doesn't support UTF-8 characters) and standard ID3 class
+     (instead of EasyID3 which doesn't support cover art).
 """
 
 import os
@@ -37,9 +41,8 @@ tracklist_path = sys.argv[2]
 # 1. Parse the tracklist
 
 # read lines from tracklist text file
-fobj = open(tracklist_path, "rt", encoding="utf8")
-lines = fobj.readlines()
-fobj.close()
+with open(tracklist_path, "rt", encoding="utf8") as fobj:
+    lines = fobj.readlines()
 
 # parse the line with a regex, to get track info
 regex = re.compile(TRACKLIST_REGEX1)
@@ -50,6 +53,14 @@ for line in lines:
     track_title = match.group(2)
     track_info = {"start_time": track_start, "title": track_title}
     tracklist += [track_info]
+
+# ask for confirmation of parsed tracklist
+print("Tracklist was parsed to following items:")
+for i, item in enumerate(tracklist):
+    print(f"{i:02d} {item['start_time']} {item['title']}")
+ans = input("Please confirm [Y/n]:")
+if ans.lower() == 'n':
+    sys.exit()
 
 
 
