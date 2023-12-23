@@ -18,8 +18,10 @@ y2mate.is
 TODO Add writing of artist, album and cover art to the ID3 tag. This will require use of an input
      definition file (because command line doesn't support UTF-8 characters) and standard ID3 class
      (instead of EasyID3 which doesn't support cover art).
+TODO Add autodetection of tracklist format.
 """
 
+import glob
 import os
 import re
 import sys
@@ -33,10 +35,28 @@ STOP_AFTER_X_TRACKS = None
 
 # matches "00:00:00   trackname"
 TRACKLIST_REGEX1 = r"([\d:]+)\s+(.+)"
+# matches "[00:00:00] trackname"
+TRACKLIST_REGEX2 = r"\[([\d:]+)\]\s+(.+)"
 
 # process command-line arguments
-album_mp3_path = sys.argv[1]
-tracklist_path = sys.argv[2]
+if len(sys.argv) == 3:
+    album_mp3_path = sys.argv[1]
+    tracklist_path = sys.argv[2]
+else:
+    mp3_list = glob.glob('*.mp3')
+    if len(mp3_list) > 0:
+        album_mp3_path = mp3_list[0]
+        print('No MP3 file specified, using first found \'%s\'' % album_mp3_path)
+    else:
+        print('ERROR: No MP3 file specified, none found.')
+        sys.exit(1)
+    txt_list = glob.glob('*.txt')
+    if len(txt_list) > 0:
+        tracklist_path = txt_list[0]
+        print('No tracklist specified, using first found \'%s\'' % tracklist_path)
+    else:
+        print('ERROR: No tracklist specified, none found.')
+        sys.exit(1)
 
 # 1. Parse the tracklist
 
@@ -45,7 +65,7 @@ with open(tracklist_path, "rt", encoding="utf8") as fobj:
     lines = fobj.readlines()
 
 # parse the line with a regex, to get track info
-regex = re.compile(TRACKLIST_REGEX1)
+regex = re.compile(TRACKLIST_REGEX2)
 tracklist = []
 for line in lines:
     match = regex.match(line)
@@ -87,7 +107,7 @@ for i, track_info in enumerate(tracklist):
 
     # write output stream
     track_filename = f"{track_number:02d} {track_title}.mp3"
-    track_path = os.path.join("data", track_filename)
+    track_path = track_filename
     if not (os.path.exists(track_path) and SKIP_EXISTING_TRACKS):
         if not track_end is None:
             track_stream = ffmpeg.output(album_stream, track_path, audio_bitrate="160k",
