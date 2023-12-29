@@ -78,6 +78,11 @@ class TrackInfo:
         ET.SubElement(album_element, 'track', attrib=attrib)
 
 
+    def save(self):
+        """Save ID3 tags to the MP3 file."""
+        self.tags.save(v2_version=3)
+
+
     def __get_tag(self, tag_id):
         tag = None
         if tag_id in self.tags:
@@ -86,66 +91,38 @@ class TrackInfo:
         return tag
 
 
-#---------------------------------------------------------------------------------------------------
-# Functions
-#---------------------------------------------------------------------------------------------------
+class AlbumInfo:
+    """Encapsulates data of a MP3 album."""
 
-def sample_id3_processing(path):
+    def __init__(self, path='.'):
+        self.path = path
+        
+        files_list = os.listdir(path)
+        mp3_list = [f for f in files_list if f.endswith('.mp3')]
 
-    # extract ID3 tags from the MP3 file 
-    tags = ID3(path)
-
-    # extract the tag with the artist (class mutagen.id3.TPE1)
-    artist_tag = tags['TPE1']
-
-    # extract the string from the tag
-    artist_str = artist_tag.text[0]
-
-    # write another string
-    tags['TPE1'] = TPE1(encoding=Encoding.UTF8, text='Another artist')
-    
-    # save changes in the tags
-    tags.save(v2_version=3)
-
-    pict = tags['APIC:'].data
-
-    with open('test.jpg', 'wb') as fobj:
-        fobj.write(pict)
+        self.track_list = []
+        for mp3_filename in mp3_list:
+            self.track_list.append(TrackInfo(mp3_filename))
 
 
-def get_list_of_mp3(path='.'):
-    """Get list of MP3 files in given directory.
-
-    Args:
-    path: Path of the directory to get the files from.
-    """
-    files_list = os.listdir(path)
-    mp3_list = [f for f in files_list if f.endswith('.mp3')]
-
-    return mp3_list
-
-
-def export_to_xml(actions=Action.NONE):
-    """Exports ID3 tags from all MP3 files in current working directory to an XML file.
-
-    Args:
-    actions: Actions to be performed with the tags before exporting.
-    """
-
-    if actions & Action.PINYIN:
-        pj = pinyin_jyutping.PinyinJyutping()
-
-    mp3_list = get_list_of_mp3()
-    album_element = ET.Element('album')
-    for mp3_filename in mp3_list:
-        track_info = TrackInfo(mp3_filename)
+    def export_to_xml(self, actions=Action.NONE):
+        """Export album information to a XML file.
+        
+        Args:
+        actions: Actions to be performed before the export.
+        """
         if actions & Action.PINYIN:
-            track_info.add_pinyin()
-        track_info.create_xml_element(album_element)
+            pj = pinyin_jyutping.PinyinJyutping()
 
-    tree = ET.ElementTree(album_element)
-    ET.indent(tree)
-    tree.write('export.xml', encoding='utf8')
+        album_element = ET.Element('album')
+        for track_info in self.track_list:
+            if actions & Action.PINYIN:
+                track_info.add_pinyin()
+            track_info.create_xml_element(album_element)
+
+        tree = ET.ElementTree(album_element)
+        ET.indent(tree)
+        tree.write('export.xml', encoding='utf8')
 
 
 #---------------------------------------------------------------------------------------------------
@@ -153,4 +130,5 @@ def export_to_xml(actions=Action.NONE):
 #---------------------------------------------------------------------------------------------------
 
 if __name__ == '__main__':
-    export_to_xml()
+    album_info = AlbumInfo()
+    album_info.export_to_xml()
