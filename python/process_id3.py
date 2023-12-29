@@ -10,7 +10,24 @@ from enum import Flag
 import pinyin_jyutping
 from mutagen.id3 import ID3, TPE1, Encoding
 
+# Tag IDs used by MP3Tag and WinAmp:
+# TALB = Album
+# TPE1 = Artist
+# TPE2 = Album Artist
+# TIT2 = Title
+# TRCK = Track
+# TDRC = Year
+# APIC: = Picture
+
+#---------------------------------------------------------------------------------------------------
+# Constants
+#---------------------------------------------------------------------------------------------------
+
 PATH_TO_MP3 = "data/sample.mp3"
+
+#---------------------------------------------------------------------------------------------------
+# Classes
+#---------------------------------------------------------------------------------------------------
 
 class Action(Flag):
     """Enumerates supported actions."""
@@ -22,15 +39,35 @@ class Action(Flag):
     """Adds pinyin for track titles."""
 
 
-# Tag IDs used by MP3Tag and WinAmp:
-# TALB = Album
-# TPE1 = Artist
-# TPE2 = Album Artist
-# TIT2 = Title
-# TRCK = Track
-# TDRC = Year
-# APIC: = Picture
+class TrackInfo:
+    """Encapsulates ID3 tags of a MP3 file and provides methods to work with them."""
 
+    pj = None
+
+    def __init__(self, path):
+        tags = ID3(path)
+        self.track_number = tags['TRCK'].text[0]
+        self.title = tags['TIT2'].text[0]
+        self.artist = tags['TPE1'].text[0]
+
+
+    def add_pinyin(self):
+        if TrackInfo.pj is None:
+            TrackInfo.pj = pinyin_jyutping.PinyinJyutping()
+
+        pinyin = TrackInfo.pj.pinyin(self.title, tone_numbers=True)
+        pinyin_removed_numbers = [x for x in pinyin if not x.isdigit()]
+        pinyin_removed_numbers = ''.join(pinyin_removed_numbers).capitalize()
+        self.title = f'{pinyin_removed_numbers} ({self.title})'
+
+
+    def create_xml_element(self, album_element):
+        ET.SubElement(album_element, 'track', title=self.title)
+
+
+#---------------------------------------------------------------------------------------------------
+# Functions
+#---------------------------------------------------------------------------------------------------
 
 def sample_id3_processing(path):
 
@@ -55,8 +92,13 @@ def sample_id3_processing(path):
         fobj.write(pict)
 
 
-def get_list_of_mp3():
-    files_list = os.listdir()
+def get_list_of_mp3(path='.'):
+    """Get list of MP3 files in given directory.
+
+    Args:
+    path: Path of the directory to get the files from.
+    """
+    files_list = os.listdir(path)
     mp3_list = [f for f in files_list if f.endswith('.mp3')]
 
     return mp3_list
@@ -80,25 +122,21 @@ def export_to_xml(actions=Action.NONE):
         pj = pinyin_jyutping.PinyinJyutping()
 
     mp3_list = get_list_of_mp3()
-    root = ET.Element('album')
+    album_element = ET.Element('album')
     for mp3_filename in mp3_list:
-        title = get_tag(mp3_filename, 'TIT2')
+        track_info = TrackInfo(mp3_filename)
         if actions & Action.PINYIN:
-            pinyin = pj.pinyin(title, tone_numbers=True)
-            pinyin_removed_numbers = [x for x in pinyin if not x.isdigit()]
-            pinyin_removed_numbers = ''.join(pinyin_removed_numbers).capitalize()
-            corrected_title = f'{pinyin_removed_numbers} ({title})'
-        else:
-            corrected_title = title
-        
-        ET.SubElement(root, 'track', title=corrected_title)
+            track_info.add_pinyin()
+        track_info.create_xml_element(album_element)
 
-    tree = ET.ElementTree(root)
+    tree = ET.ElementTree(album_element)
     ET.indent(tree)
-    tree.write('test.xml', encoding='utf8')
+    tree.write('export.xml', encoding='utf8')
 
 
-# SCRIPT BODY --------------------------------------------------------------------------------------
+#---------------------------------------------------------------------------------------------------
+# Script Body
+#---------------------------------------------------------------------------------------------------
 
 if __name__ == '__main__':
-    export_to_xml()
+    export_to_xml(actions=Action.PINYIN)
