@@ -45,10 +45,13 @@ class TrackInfo:
     pj = None
 
     def __init__(self, path):
-        tags = ID3(path)
-        self.track_number = tags['TRCK'].text[0]
-        self.title = tags['TIT2'].text[0]
-        self.artist = tags['TPE1'].text[0]
+        self.tags = ID3(path)
+        self.track_number = self.__get_tag('TRCK')
+        self.title = self.__get_tag('TIT2')
+        self.artist = self.__get_tag('TPE1')
+        self.album = self.__get_tag('TALB')
+        self.year = self.__get_tag('TDRC')
+        self.album_artist = self.__get_tag('TPE2')
 
 
     def add_pinyin(self):
@@ -62,7 +65,25 @@ class TrackInfo:
 
 
     def create_xml_element(self, album_element):
-        ET.SubElement(album_element, 'track', title=self.title)
+        """Create a XML element for the track.
+        
+        Args:
+        album_element: Parent XML element of the album.
+        """
+        attrib = {
+            'number': self.track_number,
+            'artist': self.artist,
+            'title': self.title,
+        }
+        ET.SubElement(album_element, 'track', attrib=attrib)
+
+
+    def __get_tag(self, tag_id):
+        tag = None
+        if tag_id in self.tags:
+            tag = self.tags[tag_id].text[0]
+
+        return tag
 
 
 #---------------------------------------------------------------------------------------------------
@@ -104,13 +125,6 @@ def get_list_of_mp3(path='.'):
     return mp3_list
 
 
-def get_tag(path, tag_id):
-    tags = ID3(path)
-    tag_text = tags[tag_id].text[0]
-
-    return tag_text
-
-
 def export_to_xml(actions=Action.NONE):
     """Exports ID3 tags from all MP3 files in current working directory to an XML file.
 
@@ -139,4 +153,4 @@ def export_to_xml(actions=Action.NONE):
 #---------------------------------------------------------------------------------------------------
 
 if __name__ == '__main__':
-    export_to_xml(actions=Action.PINYIN)
+    export_to_xml()
