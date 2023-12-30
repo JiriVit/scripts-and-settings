@@ -1,14 +1,23 @@
 """
-Provides means for mass processing of ID3 tags of MP3 files.
+process_id3.py: performs stuff with ID3 tags of MP3 files.
+
+Usage: 
+process_id3.py action 
+
+Arguments:
+action   Action to be performed. Supported values:
+         - export: export ID3 tags to a XML file
+         - import: import ID3 tags from a XML file
 """
 
 import os
+import sys
 import xml.etree.cElementTree as ET
 from enum import Flag
 
 # 3rd party libraries
 import pinyin_jyutping
-from mutagen.id3 import ID3, TPE1, Encoding
+from mutagen.id3 import Encoding, ID3, TALB, TDRC, TIT2, TPE1, TPE2, TRCK
 
 # Tag IDs used by MP3Tag and WinAmp:
 # TALB = Album
@@ -50,7 +59,7 @@ class TrackInfo:
         self.title = self.__get_tag('TIT2')
         self.artist = self.__get_tag('TPE1')
         self.album = self.__get_tag('TALB')
-        self.year = self.__get_tag('TDRC')
+        self.year = str(self.__get_tag('TDRC'))
         self.album_artist = self.__get_tag('TPE2')
 
 
@@ -74,12 +83,30 @@ class TrackInfo:
             'number': self.track_number,
             'artist': self.artist,
             'title': self.title,
+            'year': self.year,
         }
         ET.SubElement(album_element, 'track', attrib=attrib)
 
 
+    def import_xml_element(self, element):
+        """Import ID3 from a XML element.
+
+        Args:
+        element: The XML element to import data from.
+        """
+        self.track_number = element.attrib.get('number')
+        self.artist = element.attrib.get('artist')
+        self.title = element.attrib.get('title')
+
+
     def save(self):
         """Save ID3 tags to the MP3 file."""
+        self.__set_tag('TRCK', self.track_number)
+        self.__set_tag('TIT2', self.title)
+        self.__set_tag('TPE1', self.artist)
+        self.__set_tag('TPE2', self.album_artist)
+        self.__set_tag('TALB', self.album)
+        self.__set_tag('TDRC', self.year)
         self.tags.save(v2_version=3)
 
 
@@ -89,6 +116,22 @@ class TrackInfo:
             tag = self.tags[tag_id].text[0]
 
         return tag
+
+
+    def __set_tag(self, tag_id, value):
+        if value is not None:
+            if tag_id == 'TIT2':
+                self.tags[tag_id] = TIT2(encoding=Encoding.UTF8, text=value)
+            elif tag_id == 'TALB':
+                self.tags[tag_id] = TALB(encoding=Encoding.UTF8, text=value)
+            elif tag_id == 'TDRC':
+                self.tags[tag_id] = TDRC(encoding=Encoding.UTF8, text=value)
+            elif tag_id == 'TRCK':
+                self.tags[tag_id] = TRCK(encoding=Encoding.UTF8, text=value)
+            elif tag_id == 'TPE1':
+                self.tags[tag_id] = TPE1(encoding=Encoding.UTF8, text=value)
+            elif tag_id == 'TPE2':
+                self.tags[tag_id] = TPE2(encoding=Encoding.UTF8, text=value)
 
 
 class AlbumInfo:
@@ -111,6 +154,7 @@ class AlbumInfo:
         Args:
         actions: Actions to be performed before the export.
         """
+
         if actions & Action.PINYIN:
             pj = pinyin_jyutping.PinyinJyutping()
 
@@ -122,7 +166,27 @@ class AlbumInfo:
 
         tree = ET.ElementTree(album_element)
         ET.indent(tree)
-        tree.write('export.xml', encoding='utf8')
+        tree.write('album.xml', encoding='utf-8', xml_declaration=True)
+        print('ID3 tags have been exported to file album.xml.')
+
+
+    def import_from_xml(self):
+        """Import data from a XML file and store to the ID3 tags of the MP3 files."""
+
+        tree = ET.parse('album.xml')
+        album_element = tree.getroot()
+        
+        number_of_elements = len(album_element)
+        number_of_files = len(self.track_list)
+
+        if number_of_elements == number_of_files:
+            for i in range(number_of_elements):
+                self.track_list[i].import_xml_element(album_element[i])
+                self.track_list[i].save()
+            print('ID3 tags have been imported from file album.xml.')
+        else:
+            print(f'ERROR: Count mismatch, there are {number_of_files} MP3 files and' + 
+                  f' {number_of_elements} tracks in the XML file.')
 
 
 #---------------------------------------------------------------------------------------------------
@@ -130,5 +194,11 @@ class AlbumInfo:
 #---------------------------------------------------------------------------------------------------
 
 if __name__ == '__main__':
-    album_info = AlbumInfo()
-    album_info.export_to_xml()
+    if len(sys.argv) > 1:
+        album_info = AlbumInfo('.')
+        if sys.argv[1] == 'export':
+            album_info.export_to_xml()
+        elif sys.argv[1] == 'import':
+            album_info.import_from_xml()
+    else:
+        print(__doc__)
