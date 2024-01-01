@@ -182,15 +182,14 @@ class AlbumInfo:
         """Import data from a XML file and store to the ID3 tags of the MP3 files."""
 
         tree = ET.parse('album.xml')
-        album_element = tree.getroot()
+        self.album_element = tree.getroot()
         
-        number_of_elements = len(album_element)
+        number_of_elements = len(self.album_element)
         number_of_files = len(self.track_list)
 
         if number_of_elements == number_of_files:
             for i in range(number_of_elements):
-                self.track_list[i].import_xml_element(album_element[i])
-                self.track_list[i].save()
+                self.__import_track_element(i)
             print('ID3 tags have been imported from file album.xml.')
         else:
             print(f'ERROR: Count mismatch, there are {number_of_files} MP3 files and' + 
@@ -239,6 +238,39 @@ class AlbumInfo:
 
         # store the attribs from local alias to instance variable
         self.album_attrib = aat
+
+
+    def __import_track_element(self, index):
+        """Import data from track XML element to track ID3 tags, then add necessary data
+        from album XML element.
+        """
+
+        # create aliases
+        tel = self.album_element[index]
+        aat = self.album_element.attrib
+        trk = self.track_list[index]
+
+        # import from track element to the ID3 tags
+        trk.import_xml_element(tel)
+
+        # import from album element to the ID3 tags
+        if 'name' in aat:
+            trk.album = aat['name']
+        if 'album_artist' in aat:
+            trk.album_artist = aat['album_artist']
+
+        # replace track artist with album artist, if needed
+        if ((not 'artist' in tel.attrib) or (tel.attrib['artist'] is None)) and \
+           ('artist' in aat):
+            trk.artist = aat['artist'] 
+        
+        # replace track year with album year, if needed
+        if ((not 'year' in tel.attrib) or (tel.attrib['year'] is None)) and \
+           ('year' in aat):
+            trk.year = aat['year'] 
+        
+        # save ID3 tags to the MP3 file
+        trk.save()
 
 
 #---------------------------------------------------------------------------------------------------
