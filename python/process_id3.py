@@ -73,7 +73,7 @@ class TrackInfo:
         self.title = f'{pinyin_removed_numbers} ({self.title})'
 
 
-    def create_xml_element(self, album_element):
+    def create_xml_element(self, album_element, export_artist=False, export_year=False):
         """Create a XML element for the track.
         
         Args:
@@ -85,6 +85,11 @@ class TrackInfo:
             'title': self.title,
             'year': self.year,
         }
+        if not export_artist:
+            attrib.pop('artist')
+        if not export_year:
+            attrib.pop('year')
+
         ET.SubElement(album_element, 'track', attrib=attrib)
 
 
@@ -158,11 +163,14 @@ class AlbumInfo:
         if actions & Action.PINYIN:
             pj = pinyin_jyutping.PinyinJyutping()
 
-        album_element = ET.Element('album')
+        self.__build_album_attrib()
+        album_element = ET.Element('album', attrib=self.album_attrib)
         for track_info in self.track_list:
             if actions & Action.PINYIN:
                 track_info.add_pinyin()
-            track_info.create_xml_element(album_element)
+            track_info.create_xml_element(album_element, 
+                                          export_artist = not self.same_artist, 
+                                          export_year = not self.same_year)
 
         tree = ET.ElementTree(album_element)
         ET.indent(tree)
@@ -187,6 +195,50 @@ class AlbumInfo:
         else:
             print(f'ERROR: Count mismatch, there are {number_of_files} MP3 files and' + 
                   f' {number_of_elements} tracks in the XML file.')
+
+
+    def __build_album_attrib(self):
+        """Build dict of attribs for album XML element and store it to instance variable 
+        self.album_attrib.
+        """
+
+        # these indicate if all tracks have the same artist and year
+        self.same_artist = True
+        self.same_year = True
+        track_count = len(self.track_list)
+        if track_count > 1:
+            for i in range(1, track_count):
+                if not self.track_list[0].artist == self.track_list[i].artist:
+                    self.same_artist = False
+                if not self.track_list[0].year == self.track_list[i].year:
+                    self.same_year = False
+
+        # create aliases for shorter code
+        tk0 = self.track_list[0]
+        aat = dict()
+
+        # determine album XML element attribs 
+        if tk0.album is not None:
+            aat['name'] = tk0.album
+        else:
+            aat['name'] = '' 
+        if self.same_artist:
+            if tk0.artist is not None:
+                aat['artist'] = tk0.artist
+            else:
+                aat['artist'] = ''
+        if self.same_year:
+            if tk0.year is not None:
+                aat['year'] = tk0.year
+            else:
+                aat['year'] = ''
+        if tk0.album_artist is not None:
+            aat['album_artist'] = tk0.album_artist
+        else:
+            aat['album_artist'] = '' 
+
+        # store the attribs from local alias to instance variable
+        self.album_attrib = aat
 
 
 #---------------------------------------------------------------------------------------------------
