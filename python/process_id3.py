@@ -2,12 +2,14 @@
 process_id3.py: performs stuff with ID3 tags of MP3 files.
 
 Usage: 
-process_id3.py action 
+process_id3.py action [options]
 
 Arguments:
 action   Action to be performed. Supported values:
          - export: export ID3 tags to a XML file
          - import: import ID3 tags from a XML file
+options  Options for the action. Supported values:
+         - pinyin: convert chinese track titles to pinyin before export
 """
 
 import os
@@ -38,11 +40,11 @@ PATH_TO_MP3 = "data/sample.mp3"
 # Classes
 #---------------------------------------------------------------------------------------------------
 
-class Action(Flag):
-    """Enumerates supported actions."""
+class Options(Flag):
+    """Enumerates supported options."""
     
     NONE = 0x00
-    """No action."""
+    """No options."""
 
     PINYIN = 0x01
     """Adds pinyin for track titles."""
@@ -105,11 +107,16 @@ class TrackInfo:
 
 
     def import_front_cover(self, path):
+        """Imports front cover from a JPG file and stores it to ID3 tag.
+
+        Args:
+        path: Path to the JPG file.
+        """
+
         with open(path, 'rb') as fobj:
             pict_data = fobj.read()
 
-        pict = APIC(mime='image/jpeg', type=PictureType.COVER_FRONT, desc='Front Cover', 
-                    data=pict_data)
+        pict = APIC(mime='image/jpeg', type=PictureType.COVER_FRONT, data=pict_data)
         self.tags.delall('APIC')
         self.tags.add(pict)
 
@@ -163,17 +170,17 @@ class AlbumInfo:
             self.track_list.append(TrackInfo(mp3_filename))
 
 
-    def export_to_xml(self, actions=Action.NONE):
+    def export_to_xml(self, options=Options.NONE):
         """Export album information to a XML file.
         
         Args:
-        actions: Actions to be performed before the export.
+        options: Options for the export.
         """
 
         self.__build_album_attrib()
         album_element = ET.Element('album', attrib=self.album_attrib)
         for track_info in self.track_list:
-            if actions & Action.PINYIN:
+            if options & Options.PINYIN:
                 track_info.add_pinyin()
             track_info.create_xml_element(album_element, 
                                           export_artist = not self.same_artist, 
@@ -185,7 +192,7 @@ class AlbumInfo:
         print('ID3 tags have been exported to file album.xml.')
 
 
-    def import_from_xml(self):
+    def import_from_xml(self, options=Options.NONE):
         """Import data from a XML file and store to the ID3 tags of the MP3 files."""
 
         tree = ET.parse('album.xml')
@@ -287,7 +294,7 @@ class AlbumInfo:
 #---------------------------------------------------------------------------------------------------
 
 
-def debug():
+def debug(options=Options.NONE):
     tags = ID3('sample.mp3')
     tags.delall('APIC')
     print(tags.pprint() + '\n')
@@ -316,14 +323,28 @@ def main():
         action = sys.argv[1]
         album_info = AlbumInfo('.')
 
-        actions = {
+        supported_actions = {
             'export': album_info.export_to_xml,
             'import': album_info.import_from_xml,
             'debug': debug
         }
 
-        if action in actions.keys():
-            actions[action]()
+        # parse options
+        if len(sys.argv) > 2:
+            option = sys.argv[2]
+
+            supported_options = {
+                'pinyin': Options.PINYIN
+            }
+
+            if option in supported_options:
+                options = supported_options[option]
+        else:
+            options = Options.NONE
+
+        # perform the action
+        if action in supported_actions:
+            supported_actions[action](options)
         else:
             print('ERROR: Action not supported')
             print(__doc__)
