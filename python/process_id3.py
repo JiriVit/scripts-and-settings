@@ -195,9 +195,18 @@ class AlbumInfo:
     def import_from_xml(self, options=Options.NONE):
         """Import data from a XML file and store to the ID3 tags of the MP3 files."""
 
+        # load the XML file
         tree = ET.parse('album.xml')
         self.album_element = tree.getroot()
-        
+
+        # get cover image (if there is exactly one JPG file in the folder)
+        files = os.listdir()
+        jpg_files = [f for f in files if f.endswith('.jpg')]
+        if len(jpg_files) == 1:
+            self.cover_path = jpg_files[0]
+        else:
+            self.cover_path = None
+
         number_of_elements = len(self.album_element)
         number_of_files = len(self.track_list)
 
@@ -274,6 +283,8 @@ class AlbumInfo:
             trk.album_artist = aat['album_artist']
         if 'front_cover' in aat:
             trk.import_front_cover(aat['front_cover'])
+        elif self.cover_path is not None:
+            trk.import_front_cover(self.cover_path)
 
         # replace track artist with album artist, if needed
         if ((not 'artist' in tel.attrib) or (tel.attrib['artist'] is None)) and \
