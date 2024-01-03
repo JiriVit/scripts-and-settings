@@ -8,14 +8,15 @@ Arguments:
 action   Action to be performed. Supported values:
          - export: export ID3 tags to a XML file
          - import: import ID3 tags from a XML file
+         - rename: rename the files per their ID3 tags
 options  Options for the action. Supported values:
          - pinyin: convert chinese track titles to pinyin before export
+         - album: treat the files as an album with a single artist
+         - compilation: treat the files as an compilation with multiple artists
 """
 
-# TODO Consider if we need the TrackInfo class at all.
 # TODO Add support for jyutping.
 # TODO Add support for romaji.
-# TODO Add renaming of files.
 # TODO Add support for transcription of album and artist names.
 # TODO Add support for choice between album and compilation.
 # TODO Add restriction for transcription only if the whole string is in that language.
@@ -40,6 +41,7 @@ PATH_TO_MP3 = "data/sample.mp3"
 # Classes
 #---------------------------------------------------------------------------------------------------
 
+
 class Options(Flag):
     """Enumerates supported options."""
     
@@ -49,6 +51,12 @@ class Options(Flag):
     PINYIN = 0x01
     """Adds pinyin for track titles."""
 
+    ALBUM = 0x10
+    """Treats the album as album with one common artist."""
+
+    COMPILATION = 0x20
+    """Treats the album as compilation with multiple artists."""
+
 
 class TrackInfo:
     """Encapsulates ID3 tags of a MP3 file and provides methods to work with them."""
@@ -56,6 +64,7 @@ class TrackInfo:
     pj = None
 
     def __init__(self, path):
+        self.path = path
         self.tags = ID3(path)
         self.track_number = self.__get_tag('TRCK')
         self.title = self.__get_tag('TIT2')
@@ -130,6 +139,22 @@ class TrackInfo:
         self.__set_tag('TALB', self.album)
         self.__set_tag('TDRC', self.year)
         self.tags.save(v2_version=3)
+
+
+    def rename(self, options):
+        """Rename the MP3 file per info in its ID3 tags.
+        
+        Args:
+        options: Options for the operation.
+        """
+        new_path = None
+        if options & Options.ALBUM:
+            new_path = f'{self.track_number} {self.title}.mp3'
+        elif options & Options.COMPILATION:
+            new_path = f'{self.track_number} {self.artist} - {self.title}.mp3'
+        
+        if new_path is not None:
+            os.rename(self.path, new_path)
 
 
     def __get_tag(self, tag_id):
@@ -217,6 +242,17 @@ class AlbumInfo:
         else:
             print(f'ERROR: Count mismatch, there are {number_of_files} MP3 files and' + 
                   f' {number_of_elements} tracks in the XML file.')
+
+
+    def rename_files(self, options):
+        """Renames the MP3 files per their ID3 tags."""
+
+        if options & (Options.ALBUM | Options.COMPILATION):
+            for track_info in self.track_list:
+                track_info.rename(options)
+        else:
+            print("ERROR: Missing option 'album' / 'compilation'.")
+            print(__doc__)
 
 
     def __build_album_attrib(self):
@@ -337,6 +373,7 @@ def main():
         supported_actions = {
             'export': album_info.export_to_xml,
             'import': album_info.import_from_xml,
+            'rename': album_info.rename_files,
             'debug': debug
         }
 
@@ -344,13 +381,15 @@ def main():
         options = Options.NONE
         if len(sys.argv) > 2:
             supported_options = {
-                'pinyin': Options.PINYIN
+                'pinyin': Options.PINYIN,
+                'album': Options.ALBUM,
+                'compilation': Options.COMPILATION
             }
 
             for i in range(2, len(sys.argv)):
                 opt = sys.argv[i]
                 if opt in supported_options:
-                    options = options + supported_options[opt]
+                    options = options | supported_options[opt]
 
         # perform the action
         if action in supported_actions:
