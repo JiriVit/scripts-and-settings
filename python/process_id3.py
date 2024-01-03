@@ -12,6 +12,15 @@ options  Options for the action. Supported values:
          - pinyin: convert chinese track titles to pinyin before export
 """
 
+# TODO Consider if we need the TrackInfo class at all.
+# TODO Add support for jyutping.
+# TODO Add support for romaji.
+# TODO Add renaming of files.
+# TODO Add support for transcription of album and artist names.
+# TODO Add support for choice between album and compilation.
+# TODO Add restriction for transcription only if the whole string is in that language.
+# TODO Add auto detection of language.
+
 import os
 import sys
 import xml.etree.cElementTree as ET
@@ -20,15 +29,6 @@ from enum import Flag
 # 3rd party libraries
 import pinyin_jyutping
 from mutagen.id3 import Encoding, PictureType, ID3, APIC, TALB, TDRC, TIT2, TPE1, TPE2, TRCK
-
-# Tag IDs used by MP3Tag and WinAmp:
-# TALB = Album
-# TPE1 = Artist
-# TPE2 = Album Artist
-# TIT2 = Title
-# TRCK = Track
-# TDRC = Year
-# APIC: = Picture
 
 #---------------------------------------------------------------------------------------------------
 # Constants
@@ -341,17 +341,16 @@ def main():
         }
 
         # parse options
+        options = Options.NONE
         if len(sys.argv) > 2:
-            option = sys.argv[2]
-
             supported_options = {
                 'pinyin': Options.PINYIN
             }
 
-            if option in supported_options:
-                options = supported_options[option]
-        else:
-            options = Options.NONE
+            for i in range(2, len(sys.argv)):
+                opt = sys.argv[i]
+                if opt in supported_options:
+                    options = options + supported_options[opt]
 
         # perform the action
         if action in supported_actions:
