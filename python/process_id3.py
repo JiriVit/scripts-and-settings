@@ -17,7 +17,7 @@ from enum import Flag
 
 # 3rd party libraries
 import pinyin_jyutping
-from mutagen.id3 import Encoding, ID3, TALB, TDRC, TIT2, TPE1, TPE2, TRCK
+from mutagen.id3 import Encoding, PictureType, ID3, APIC, TALB, TDRC, TIT2, TPE1, TPE2, TRCK
 
 # Tag IDs used by MP3Tag and WinAmp:
 # TALB = Album
@@ -93,7 +93,7 @@ class TrackInfo:
         ET.SubElement(album_element, 'track', attrib=attrib)
 
 
-    def import_xml_element(self, element):
+    def import_xml_element(self, element:ET.Element):
         """Import ID3 from a XML element.
 
         Args:
@@ -102,6 +102,16 @@ class TrackInfo:
         self.track_number = element.attrib.get('number')
         self.artist = element.attrib.get('artist')
         self.title = element.attrib.get('title')
+
+
+    def import_front_cover(self, path):
+        with open(path, 'rb') as fobj:
+            pict_data = fobj.read()
+
+        pict = APIC(mime='image/jpeg', type=PictureType.COVER_FRONT, desc='Front Cover', 
+                    data=pict_data)
+        self.tags.delall('APIC')
+        self.tags.add(pict)
 
 
     def save(self):
@@ -159,9 +169,6 @@ class AlbumInfo:
         Args:
         actions: Actions to be performed before the export.
         """
-
-        if actions & Action.PINYIN:
-            pj = pinyin_jyutping.PinyinJyutping()
 
         self.__build_album_attrib()
         album_element = ET.Element('album', attrib=self.album_attrib)
@@ -258,6 +265,8 @@ class AlbumInfo:
             trk.album = aat['name']
         if 'album_artist' in aat:
             trk.album_artist = aat['album_artist']
+        if 'front_cover' in aat:
+            trk.import_front_cover(aat['front_cover'])
 
         # replace track artist with album artist, if needed
         if ((not 'artist' in tel.attrib) or (tel.attrib['artist'] is None)) and \
@@ -274,15 +283,58 @@ class AlbumInfo:
 
 
 #---------------------------------------------------------------------------------------------------
+# Functions
+#---------------------------------------------------------------------------------------------------
+
+
+def debug():
+    tags = ID3('sample.mp3')
+    tags.delall('APIC')
+    print(tags.pprint() + '\n')
+
+    with open('cover1.jpg', 'rb') as fobj:
+        pict_data = fobj.read()
+
+    pict1 = APIC(mime='image/jpeg', type=PictureType.COVER_FRONT, data=pict_data, desc='1')
+    tags.add(pict1)
+    print(tags.pprint() + '\n')
+
+    with open('cover2.jpg', 'rb') as fobj:
+        pict_data = fobj.read()
+
+    pict2 = APIC(mime='image/jpeg', type=PictureType.COVER_BACK, data=pict_data, desc='2')
+    tags.add(pict2)
+    print(tags.pprint() + '\n')
+
+    print(tags.keys())
+
+    tags.save()
+
+
+def main():
+    if len(sys.argv) > 1:
+        action = sys.argv[1]
+        album_info = AlbumInfo('.')
+
+        actions = {
+            'export': album_info.export_to_xml,
+            'import': album_info.import_from_xml,
+            'debug': debug
+        }
+
+        if action in actions.keys():
+            actions[action]()
+        else:
+            print('ERROR: Action not supported')
+            print(__doc__)
+    else:
+        print(__doc__)
+
+
+#---------------------------------------------------------------------------------------------------
 # Script Body
 #---------------------------------------------------------------------------------------------------
 
+
 if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        album_info = AlbumInfo('.')
-        if sys.argv[1] == 'export':
-            album_info.export_to_xml()
-        elif sys.argv[1] == 'import':
-            album_info.import_from_xml()
-    else:
-        print(__doc__)
+    main()
