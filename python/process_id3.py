@@ -28,14 +28,16 @@ import xml.etree.cElementTree as ET
 from enum import Flag
 
 # 3rd party libraries
-import pinyin_jyutping
+from pinyin_jyutping import PinyinJyutping
 from mutagen.id3 import Encoding, PictureType, ID3, APIC, TALB, TDRC, TIT2, TPE1, TPE2, TRCK
 
 #---------------------------------------------------------------------------------------------------
 # Constants
 #---------------------------------------------------------------------------------------------------
 
-PATH_TO_MP3 = "data/sample.mp3"
+ROMANIZATION_DICT = {
+    '鳳飛飛': 'Fong Fei-Fei',
+}
 
 #---------------------------------------------------------------------------------------------------
 # Classes
@@ -49,7 +51,13 @@ class Options(Flag):
     """No options."""
 
     PINYIN = 0x01
-    """Adds pinyin for track titles."""
+    """Adds pinyin for track and album titles in Chinese."""
+
+    JYUTPING = 0x02
+    """Adds jyutping for track and album titles in Cantonese."""
+
+    ROMAJI = 0x04
+    """Adds romaji for track and album titles in Japanese."""
 
     ALBUM = 0x10
     """Treats the album as album with one common artist."""
@@ -72,16 +80,6 @@ class TrackInfo:
         self.album = self.__get_tag('TALB')
         self.year = str(self.__get_tag('TDRC'))
         self.album_artist = self.__get_tag('TPE2')
-
-
-    def add_pinyin(self):
-        if TrackInfo.pj is None:
-            TrackInfo.pj = pinyin_jyutping.PinyinJyutping()
-
-        pinyin = TrackInfo.pj.pinyin(self.title, tone_numbers=True)
-        pinyin_removed_numbers = [x for x in pinyin if not x.isdigit()]
-        pinyin_removed_numbers = ''.join(pinyin_removed_numbers).capitalize()
-        self.title = f'{pinyin_removed_numbers} ({self.title})'
 
 
     def create_xml_element(self, album_element, export_artist=False, export_year=False):
@@ -184,8 +182,11 @@ class TrackInfo:
 class AlbumInfo:
     """Encapsulates data of a MP3 album."""
 
-    def __init__(self, path='.'):
+    pj = None
+
+    def __init__(self, path='.', options=Options.NONE):
         self.path = path
+        self.options = options
         
         files_list = os.listdir(path)
         mp3_list = [f for f in files_list if f.endswith('.mp3')]
@@ -195,7 +196,7 @@ class AlbumInfo:
             self.track_list.append(TrackInfo(mp3_filename))
 
 
-    def export_to_xml(self, options=Options.NONE):
+    def export_to_xml(self):
         """Export album information to a XML file.
         
         Args:
@@ -205,8 +206,7 @@ class AlbumInfo:
         self.__build_album_attrib()
         album_element = ET.Element('album', attrib=self.album_attrib)
         for track_info in self.track_list:
-            if options & Options.PINYIN:
-                track_info.add_pinyin()
+            track_info.title = self.__add_romanization(track_info.title)
             track_info.create_xml_element(album_element, 
                                           export_artist = not self.same_artist, 
                                           export_year = not self.same_year)
@@ -217,7 +217,7 @@ class AlbumInfo:
         print('ID3 tags have been exported to file album.xml.')
 
 
-    def import_from_xml(self, options=Options.NONE):
+    def import_from_xml(self):
         """Import data from a XML file and store to the ID3 tags of the MP3 files."""
 
         # load the XML file
@@ -244,12 +244,12 @@ class AlbumInfo:
                   f' {number_of_elements} tracks in the XML file.')
 
 
-    def rename_files(self, options):
+    def rename_files(self):
         """Renames the MP3 files per their ID3 tags."""
 
-        if options & (Options.ALBUM | Options.COMPILATION):
+        if self.options & (Options.ALBUM | Options.COMPILATION):
             for track_info in self.track_list:
-                track_info.rename(options)
+                track_info.rename(self.options)
         else:
             print("ERROR: Missing option 'album' / 'compilation'.")
             print(__doc__)
@@ -277,12 +277,13 @@ class AlbumInfo:
 
         # determine album XML element attribs 
         if tk0.album is not None:
-            aat['name'] = tk0.album
+            aat['name'] = self.__add_romanization(tk0.album)
         else:
-            aat['name'] = '' 
+            aat['name'] = ''
         if self.same_artist:
             if tk0.artist is not None:
-                aat['artist'] = tk0.artist
+                aat['artist'] = \
+                    self.__add_romanization(tk0.artist, preserve_original=False, lookup=True)
             else:
                 aat['artist'] = ''
         if self.same_year:
@@ -291,7 +292,8 @@ class AlbumInfo:
             else:
                 aat['year'] = ''
         if tk0.album_artist is not None:
-            aat['album_artist'] = tk0.album_artist
+            aat['album_artist'] = \
+                self.__add_romanization(tk0.album_artist, preserve_original=False, lookup=True)
         else:
             aat['album_artist'] = '' 
 
@@ -336,12 +338,38 @@ class AlbumInfo:
         trk.save()
 
 
+    def __add_romanization(self, text, preserve_original=True, lookup=False):
+
+        romanization = text
+
+        if lookup and (text in ROMANIZATION_DICT):
+            romanization = ROMANIZATION_DICT[text]
+        elif self.options & (Options.PINYIN | Options.JYUTPING):
+
+            # this instance is quite expensive, so we create it once and reuse it
+            if AlbumInfo.pj is None:
+                AlbumInfo.pj = PinyinJyutping()
+
+            if self.options & Options.PINYIN:
+                romanization = AlbumInfo.pj.pinyin(text, tone_numbers=True)
+            else:
+                romanization = AlbumInfo.pj.jyutping(text, tone_numbers=True)
+
+            romanization = [x for x in romanization if not x.isdigit()]
+            romanization = ''.join(romanization).capitalize()
+
+        if preserve_original and (romanization != text):
+            romanization = f'{romanization} ({text})'
+
+        return romanization
+
+
 #---------------------------------------------------------------------------------------------------
 # Functions
 #---------------------------------------------------------------------------------------------------
 
 
-def debug(options=Options.NONE):
+def debug():
     tags = ID3('sample.mp3')
     tags.delall('APIC')
     print(tags.pprint() + '\n')
@@ -368,14 +396,6 @@ def debug(options=Options.NONE):
 def main():
     if len(sys.argv) > 1:
         action = sys.argv[1]
-        album_info = AlbumInfo('.')
-
-        supported_actions = {
-            'export': album_info.export_to_xml,
-            'import': album_info.import_from_xml,
-            'rename': album_info.rename_files,
-            'debug': debug
-        }
 
         # parse options
         options = Options.NONE
@@ -390,10 +410,19 @@ def main():
                 opt = sys.argv[i]
                 if opt in supported_options:
                     options = options | supported_options[opt]
+        
+        album_info = AlbumInfo('.', options)
+        
+        supported_actions = {
+            'export': album_info.export_to_xml,
+            'import': album_info.import_from_xml,
+            'rename': album_info.rename_files,
+            'debug': debug
+        }
 
         # perform the action
         if action in supported_actions:
-            supported_actions[action](options)
+            supported_actions[action]()
         else:
             print('ERROR: Action not supported')
             print(__doc__)
