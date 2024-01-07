@@ -350,13 +350,16 @@ class AlbumInfo:
             if AlbumInfo.pj is None:
                 AlbumInfo.pj = PinyinJyutping()
 
-            if self.options & Options.PINYIN:
-                romanization = AlbumInfo.pj.pinyin(text, tone_numbers=True)
-            else:
-                romanization = AlbumInfo.pj.jyutping(text, tone_numbers=True)
+            try:
+                if self.options & Options.PINYIN:
+                    romanization = AlbumInfo.pj.pinyin(text, tone_numbers=True)
+                else:
+                    romanization = AlbumInfo.pj.jyutping(text, tone_numbers=True)
+                romanization = [x for x in romanization if not x.isdigit()]
+                romanization = ''.join(romanization).capitalize()
+            except:
+                print(f'ERROR: Romanization failed for string \'{text}\'')
 
-            romanization = [x for x in romanization if not x.isdigit()]
-            romanization = ''.join(romanization).capitalize()
 
         if preserve_original and (romanization != text):
             romanization = f'{romanization} ({text})'
