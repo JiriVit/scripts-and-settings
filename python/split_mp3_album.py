@@ -33,10 +33,21 @@ from mutagen.easyid3 import EasyID3
 SKIP_EXISTING_TRACKS = False
 STOP_AFTER_X_TRACKS = None
 
+
+
 # matches "00:00:00   trackname"
 TRACKLIST_REGEX1 = r"([\d:]+)\s+(.+)"
 # matches "[00:00:00] trackname"
 TRACKLIST_REGEX2 = r"\[([\d:]+)\]\s+(.+)"
+
+TRACK_FORMATS = [
+    # "00:00:00 title"
+    (r"([\d:]+)\s+(.+)", ['start_time', 'title']),
+    # "[00:00:00] title"
+    (r"\[([\d:]+)\]\s+(.+)", ['start_time', 'title']),
+    # "00.title [00:00:00]"
+    (r"\d+\.(.+)\s+\[([\d:]+)\]", ['title', 'start_time'])
+]
 
 # process command-line arguments
 if len(sys.argv) == 3:
@@ -65,14 +76,17 @@ with open(tracklist_path, "rt", encoding="utf8") as fobj:
     lines = fobj.readlines()
 
 # parse the line with a regex, to get track info
-regex = re.compile(TRACKLIST_REGEX2)
+track_format = TRACK_FORMATS[2]
+track_regex = track_format[0]
+track_fields = track_format[1]
+regex = re.compile(track_regex)
 tracklist = []
 for line in lines:
     match = regex.match(line)
-    track_start = match.group(1)
-    track_title = match.group(2)
-    track_info = {"start_time": track_start, "title": track_title}
-    tracklist += [track_info]
+    track_info = {}
+    for i in range(len(track_fields)):
+        track_info[track_fields[i]] = match.group(i+1)
+    tracklist.append(track_info)
 
 # ask for confirmation of parsed tracklist
 print("Tracklist was parsed to following items:")
