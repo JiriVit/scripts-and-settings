@@ -15,9 +15,7 @@ options  Options for the action. Supported values:
          - compilation: treat the files as an compilation with multiple artists
 """
 
-# TODO Add support for jyutping.
 # TODO Add support for romaji.
-# TODO Add support for transcription of album and artist names.
 # TODO Add support for choice between album and compilation.
 # TODO Add restriction for transcription only if the whole string is in that language.
 # TODO Add auto detection of language.
@@ -30,6 +28,7 @@ from enum import Flag
 # 3rd party libraries
 from pinyin_jyutping import PinyinJyutping
 from mutagen.id3 import Encoding, PictureType, ID3, APIC, TALB, TDRC, TIT2, TPE1, TPE2, TRCK
+from mutagen.mp3 import MP3
 
 #---------------------------------------------------------------------------------------------------
 # Constants
@@ -195,6 +194,8 @@ class AlbumInfo:
         for mp3_filename in mp3_list:
             self.track_list.append(TrackInfo(mp3_filename))
 
+        self.__check_same_tags()
+
 
     def export_to_xml(self):
         """Export album information to a XML file.
@@ -255,21 +256,37 @@ class AlbumInfo:
             print(__doc__)
 
 
+    def create_playlist(self):
+        """Create playlist for Winamp."""
+        
+        trk0 = self.track_list[0]
+        if self.same_artist is not None:
+            artist = f'{self.same_artist} - '
+        else:
+            artist = ''
+        if self.same_year is not None:
+            year = f' ({self.same_year})'
+        else:
+            year = ''
+
+        filename = f'!{artist}{trk0.album}{year}.m3u8'
+
+        with open(filename, 'wt', encoding='utf_8_sig') as fobj:
+            fobj.write('#EXTM3U\n')
+            for track in self.track_list:
+                audio = MP3(track.path)
+                length = int(audio.info.length)
+                title = f'{track.artist} - {track.title}'                
+                fobj.write(f'#EXTINF:{length},{title}\n')
+                fobj.write(f'{track.path}\n')
+        
+        print(f'Created playlist file \'{filename}\'.')
+
+
     def __build_album_attrib(self):
         """Build dict of attribs for album XML element and store it to instance variable 
         self.album_attrib.
         """
-
-        # these indicate if all tracks have the same artist and year
-        self.same_artist = True
-        self.same_year = True
-        track_count = len(self.track_list)
-        if track_count > 1:
-            for i in range(1, track_count):
-                if not self.track_list[0].artist == self.track_list[i].artist:
-                    self.same_artist = False
-                if not self.track_list[0].year == self.track_list[i].year:
-                    self.same_year = False
 
         # create aliases for shorter code
         tk0 = self.track_list[0]
@@ -280,17 +297,11 @@ class AlbumInfo:
             aat['name'] = self.__add_romanization(tk0.album)
         else:
             aat['name'] = ''
-        if self.same_artist:
-            if tk0.artist is not None:
-                aat['artist'] = \
-                    self.__add_romanization(tk0.artist, preserve_original=False, lookup=True)
-            else:
-                aat['artist'] = ''
-        if self.same_year:
-            if tk0.year is not None:
-                aat['year'] = tk0.year
-            else:
-                aat['year'] = ''
+        if self.same_artist is not None:
+            aat['artist'] = \
+                self.__add_romanization(self.same_artist, preserve_original=False, lookup=True)
+        if self.same_year is not None:
+            aat['year'] = self.same_year
         if tk0.album_artist is not None:
             aat['album_artist'] = \
                 self.__add_romanization(tk0.album_artist, preserve_original=False, lookup=True)
@@ -367,6 +378,40 @@ class AlbumInfo:
         return romanization
 
 
+    def __check_same_tags(self):
+        """Check if all tracks have the same artist and year, and if so, store them to instance
+        variables 'same_artist' and 'same_year'; otherwise keep those as None.
+        """
+
+        trl = self.track_list  # alias
+
+        same_artist = True
+        same_year = True
+        
+        track_count = len(trl)
+        if track_count > 1:
+            for i in range(1, track_count):
+                if not trl[0].artist == trl[i].artist:
+                    same_artist = False
+                if not trl[0].year == trl[i].year:
+                    same_year = False
+
+        if same_artist:
+            if trl[0].artist is None:
+                self.same_artist = ''
+            else:
+                self.same_artist = trl[0].artist
+        else:
+            self.same_artist = None
+        if same_year:
+            if trl[0].year is None:
+                self.same_year = ''
+            else:
+                self.same_year = trl[0].year
+        else:
+            self.same_year = None
+
+
 #---------------------------------------------------------------------------------------------------
 # Functions
 #---------------------------------------------------------------------------------------------------
@@ -421,6 +466,7 @@ def main():
             'export': album_info.export_to_xml,
             'import': album_info.import_from_xml,
             'rename': album_info.rename_files,
+            'playlist': album_info.create_playlist,
             'debug': debug
         }
 
