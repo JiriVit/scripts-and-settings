@@ -405,6 +405,7 @@ def main():
         if len(sys.argv) > 2:
             supported_options = {
                 'pinyin': Options.PINYIN,
+                'jyutping': Options.JYUTPING,
                 'album': Options.ALBUM,
                 'compilation': Options.COMPILATION
             }
