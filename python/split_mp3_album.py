@@ -18,7 +18,8 @@ y2mate.is
 TODO Add writing of artist, album and cover art to the ID3 tag. This will require use of an input
      definition file (because command line doesn't support UTF-8 characters) and standard ID3 class
      (instead of EasyID3 which doesn't support cover art).
-TODO Add autodetection of tracklist format.
+TODO Add autodetection of tracklist format ... or interactive selection.
+TODO Smoothen the use of artist in the new format, there is room for improvement.
 """
 
 import glob
@@ -46,7 +47,9 @@ TRACK_FORMATS = [
     # "[00:00:00] title"
     (r"\[([\d:]+)\]\s+(.+)", ['start_time', 'title']),
     # "00.title [00:00:00]"
-    (r"\d+\.(.+)\s+\[([\d:]+)\]", ['title', 'start_time'])
+    (r"\d+\.(.+)\s+\[([\d:]+)\]", ['title', 'start_time']),
+    # "[00:00:00] artist - title"
+    (r"([\d:]+)\s+(.+)\s-\s(.+)", ['start_time', 'artist', 'title']),
 ]
 
 # process command-line arguments
@@ -76,7 +79,7 @@ with open(tracklist_path, "rt", encoding="utf8") as fobj:
     lines = fobj.readlines()
 
 # parse the line with a regex, to get track info
-track_format = TRACK_FORMATS[2]
+track_format = TRACK_FORMATS[3]
 track_regex = track_format[0]
 track_fields = track_format[1]
 regex = re.compile(track_regex)
@@ -135,6 +138,8 @@ for i, track_info in enumerate(tracklist):
     id3 = EasyID3(track_path)
     id3["tracknumber"] = f"{track_number:02d}"
     id3["title"] = track_title
+    if 'artist' in track_info:
+        id3['artist'] = track_info['artist']
     id3.save()
 
     # stop after X tracks (to save time while debugging)
