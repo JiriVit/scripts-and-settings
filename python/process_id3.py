@@ -19,6 +19,7 @@ options  Options for the action. Supported values:
 # TODO Add support for choice between album and compilation.
 # TODO Add restriction for transcription only if the whole string is in that language.
 # TODO Add auto detection of language.
+# TODO Fix building of playlist name with characters not supported in Windows filenames.
 
 import os
 import sys
