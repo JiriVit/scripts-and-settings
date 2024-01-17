@@ -34,22 +34,11 @@ from mutagen.easyid3 import EasyID3
 SKIP_EXISTING_TRACKS = False
 STOP_AFTER_X_TRACKS = None
 
-
-
-# matches "00:00:00   trackname"
-TRACKLIST_REGEX1 = r"([\d:]+)\s+(.+)"
-# matches "[00:00:00] trackname"
-TRACKLIST_REGEX2 = r"\[([\d:]+)\]\s+(.+)"
-
 TRACK_FORMATS = [
-    # "00:00:00 title"
-    (r"([\d:]+)\s+(.+)", ['start_time', 'title']),
-    # "[00:00:00] title"
-    (r"\[([\d:]+)\]\s+(.+)", ['start_time', 'title']),
-    # "00.title [00:00:00]"
-    (r"\d+\.(.+)\s+\[([\d:]+)\]", ['title', 'start_time']),
-    # "[00:00:00] artist - title"
-    (r"([\d:]+)\s+(.+)\s-\s(.+)", ['start_time', 'artist', 'title']),
+    ('00:00 Title', r'([\d:]+)\s+(.+)', ['start_time', 'title']),
+    ('[00:00] Title', r'\[([\d:]+)\]\s+(.+)', ['start_time', 'title']),
+    ('00.Title [00:00]', r'\d+\.(.+)\s+\[([\d:]+)\]', ['title', 'start_time']),
+    ('00:00 Artist - Title', r'([\d:]+)\s+(.+)\s-\s(.+)', ['start_time', 'artist', 'title']),
 ]
 
 # process command-line arguments
@@ -60,48 +49,51 @@ else:
     mp3_list = glob.glob('*.mp3')
     if len(mp3_list) > 0:
         album_mp3_path = mp3_list[0]
-        print('No MP3 file specified, using first found \'%s\'' % album_mp3_path)
+        print(f"WARNING: No MP3 file specified, using '{album_mp3_path}'.")
     else:
         print('ERROR: No MP3 file specified, none found.')
         sys.exit(1)
     txt_list = glob.glob('*.txt')
     if len(txt_list) > 0:
         tracklist_path = txt_list[0]
-        print('No tracklist specified, using first found \'%s\'' % tracklist_path)
+        print(f"WARNING: No tracklist specified, using '{tracklist_path}'")
     else:
         print('ERROR: No tracklist specified, none found.')
         sys.exit(1)
-
-# 1. Parse the tracklist
 
 # read lines from tracklist text file
 with open(tracklist_path, "rt", encoding="utf8") as fobj:
     lines = fobj.readlines()
 
+# ask for selection of tracklist format
+print(f'\nFirst line of provided tracklist:')
+print(lines[0])
+print('Supported tracklist formats:')
+trfl_len = len(TRACK_FORMATS)
+for i in range(trfl_len):
+    trf = TRACK_FORMATS[i]
+    print(f'{i + 1}:   {trf[0]}')
+ans = int(input('Select format (1-4): '))
+selected_trf = TRACK_FORMATS[int(ans) - 1]
+
 # parse the line with a regex, to get track info
-track_format = TRACK_FORMATS[3]
-track_regex = track_format[0]
-track_fields = track_format[1]
-regex = re.compile(track_regex)
+trf_regex = selected_trf[1]
+trf_fields = selected_trf[2]
+regex = re.compile(trf_regex)
 tracklist = []
 for line in lines:
     match = regex.match(line)
     track_info = {}
-    for i in range(len(track_fields)):
-        track_info[track_fields[i]] = match.group(i+1)
+    for i in range(len(trf_fields)):
+        track_info[trf_fields[i]] = match.group(i+1)
     tracklist.append(track_info)
 
 # ask for confirmation of parsed tracklist
-print("Tracklist was parsed to following items:")
-for i, item in enumerate(tracklist):
-    print(f"{i:02d} {item['start_time']} {item['title']}")
+print("Tracklist has been parsed to following items:")
+print('\n'.join([str(x) for x in tracklist]))
 ans = input("Please confirm [Y/n]:")
 if ans.lower() == 'n':
-    sys.exit()
-
-
-
-# 2. Split the album MP3 to single tracks
+    sys.exit(0)
 
 # load the album MP3
 album_stream = ffmpeg.input(album_mp3_path).audio
