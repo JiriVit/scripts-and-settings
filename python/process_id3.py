@@ -37,6 +37,21 @@ from mutagen.mp3 import MP3
 
 ROMANIZATION_DICT = {
     '鳳飛飛': 'Fong Fei-Fei',
+    '汪明荃': 'Liza Wang',
+    '蔡國權': 'Terence Choi',
+    '陳百強': 'Danny Chan',
+    '譚詠麟': 'Alan Tam',
+    '鄭少秋': 'Adam Cheng',
+    '許冠傑': 'Sam Hui',
+    '徐小鳳': 'Paula Tsui',
+    '葉倩文': 'Sally Yeh',
+    '關淑怡': 'Shirley Kwan',
+    '黃寶欣': 'Sarah Wong',
+    '蔡楓華': 'Ken Choi',
+    '呂方': 'David Lui',
+    '梅艷芳': 'Anita Mui',
+    '黃耀明': 'Anthony Wong',
+    '張德蘭': 'Teresa Cheung',
 }
 
 #---------------------------------------------------------------------------------------------------
@@ -209,6 +224,7 @@ class AlbumInfo:
         album_element = ET.Element('album', attrib=self.album_attrib)
         for track_info in self.track_list:
             track_info.title = self.__add_romanization(track_info.title)
+            track_info.artist = self.__add_romanization(track_info.artist, preserve_original=False, lookup=True)
             track_info.create_xml_element(album_element, 
                                           export_artist = not self.same_artist, 
                                           export_year = not self.same_year)
