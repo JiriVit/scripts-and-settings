@@ -24,6 +24,7 @@ import xml.etree.cElementTree as ET
 
 import ffmpeg
 from mutagen.id3 import Encoding, PictureType, ID3, APIC, TALB, TDRC, TIT2, TPE1, TPE2, TRCK
+from mutagen.mp3 import MP3
 
 #---------------------------------------------------------------------------------------------------
 # Constants
@@ -190,6 +191,10 @@ def split_mp3(mp3_path):
     else:
         img = None
 
+    # get bitrate
+    audio = MP3(mp3_path)
+    bitrate = int(audio.info.bitrate / 1000)    
+
     # iterate through tracklist
     track_count = len(album_element)
     for i, track_element in enumerate(album_element):
@@ -204,9 +209,6 @@ def split_mp3(mp3_path):
         ttit = track_element.attrib['title']
         tart = track_element.attrib['artist']
 
-        # TODO Use bitrate of the input file. We now set the bitrate explicitly, because it
-        #      was reduced from original 160k to 128k, for some reason.
-
         # build filename
         if tart == '%album_artist%':
             tart = album_element.attrib['artist']
@@ -219,10 +221,10 @@ def split_mp3(mp3_path):
         track_path = track_filename
         if not (os.path.exists(track_path) and SKIP_EXISTING_TRACKS):
             if not tend is None:
-                track_stream = ffmpeg.output(album_stream, track_path, audio_bitrate="160k",
+                track_stream = ffmpeg.output(album_stream, track_path, audio_bitrate=f'{bitrate}k',
                     ss=tsta, to=tend)
             else:
-                track_stream = ffmpeg.output(album_stream, track_path, audio_bitrate="160k",
+                track_stream = ffmpeg.output(album_stream, track_path, audio_bitrate=f'{bitrate}k',
                     ss=tsta)
             ffmpeg.run(track_stream)
 
