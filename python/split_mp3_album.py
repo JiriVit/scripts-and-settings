@@ -14,10 +14,9 @@ Pre-requisites:
 
 Recommended YouTube to MP3 Converter:
 y2mate.com
-
-TODO Add use of XML definition file.
-TODO Smoothen the use of artist in the new format, there is room for improvement.
 """
+
+#TODO Add support for cover art.
 
 import glob
 import os
@@ -26,7 +25,7 @@ import sys
 import xml.etree.cElementTree as ET
 
 import ffmpeg
-from mutagen.easyid3 import EasyID3
+from mutagen.id3 import Encoding, PictureType, ID3, APIC, TALB, TDRC, TIT2, TPE1, TPE2, TRCK
 
 #---------------------------------------------------------------------------------------------------
 # Constants
@@ -110,11 +109,16 @@ def parse_tracklist(path):
 
 
 def create_album_xml(tracklist):
+    """Create file 'album.xml' with list of tracks and their parsed information.
+    
+    Args:
+    tracklist: Tracklist as a list of dicts.
+    """
+
     album_attrib = {
         'name': '',
         'artist': '',
         'year': '',
-        'album_artist': '',
     }
 
     # find out if all track have same artist or no artist
@@ -133,8 +137,9 @@ def create_album_xml(tracklist):
                 break
 
     if same_artist:
-        album_attrib.pop('artist')
-        album_attrib['album_artist'] = tk0['artist']
+        album_attrib['artist'] = tk0['artist']
+    elif not no_artist:
+        album_attrib['artist'] = 'VA'
 
     # create XML tree
     album_element = ET.Element('album', attrib=album_attrib)
@@ -142,8 +147,8 @@ def create_album_xml(tracklist):
         attrib = {
             'start_time': trk['start_time']
         }
-        if no_artist:
-            attrib['artist'] = '%album%'
+        if no_artist or same_artist:
+            attrib['artist'] = '%album_artist%'
         elif 'artist' in trk:
             attrib['artist'] = trk['artist']
         else:
@@ -157,7 +162,13 @@ def create_album_xml(tracklist):
     tree.write('album.xml', encoding='utf-8', xml_declaration=True)
 
 
-def split_album(mp3_path):
+def split_mp3(mp3_path):
+    """Split MP3 file to single tracks according to information stored in
+    file 'album.xml'.
+
+    Args:
+    mp3_path: Path to the MP3 file.
+    """
 
     # load album MP3
     album_stream = ffmpeg.input(mp3_path).audio
@@ -171,35 +182,46 @@ def split_album(mp3_path):
     for i, track_element in enumerate(album_element):
 
         # get data fields from track info
-        track_number = i + 1
-        track_start = track_element.attrib['start_time']
+        tnum = i + 1
+        tsta = track_element.attrib['start_time']
         if i < (track_count - 1):
-            track_end = album_element[i + 1].attrib['start_time']
+            tend = album_element[i + 1].attrib['start_time']
         else:
-            track_end = None
-        track_title = track_element.attrib['title']
+            tend = None
+        ttit = track_element.attrib['title']
+        tart = track_element.attrib['artist']
 
         # TODO Use bitrate of the input file. We now set the bitrate explicitly, because it
         #      was reduced from original 160k to 128k, for some reason.
 
+        # build filename
+        if tart == '%album_artist%':
+            tart = album_element.attrib['artist']
+            fnart = ''
+        else:
+            fnart = f'{tart} - '
+
         # write output stream
-        track_filename = f"{track_number:02d} {track_title}.mp3"
+        track_filename = f'{tnum:02d} {fnart}{ttit}.mp3'
         track_path = track_filename
         if not (os.path.exists(track_path) and SKIP_EXISTING_TRACKS):
-            if not track_end is None:
+            if not tend is None:
                 track_stream = ffmpeg.output(album_stream, track_path, audio_bitrate="160k",
-                    ss=track_start, to=track_end)
+                    ss=tsta, to=tend)
             else:
                 track_stream = ffmpeg.output(album_stream, track_path, audio_bitrate="160k",
-                    ss=track_start)
+                    ss=tsta)
             ffmpeg.run(track_stream)
 
         # write ID3 tags
-        id3 = EasyID3(track_path)
-        id3["tracknumber"] = f"{track_number:02d}"
-        id3["title"] = track_title
-        if 'artist' in track_element.attrib:
-            id3['artist'] = track_element.attrib['artist']
+        id3 = ID3(track_path)
+        id3.delete()
+        id3.add(TRCK(encoding=Encoding.UTF8, text=f'{tnum:02d}'))
+        id3.add(TIT2(encoding=Encoding.UTF8, text=ttit))
+        id3.add(TPE1(encoding=Encoding.UTF8, text=tart))
+        id3.add(TPE2(encoding=Encoding.UTF8, text=album_element.attrib['artist']))
+        id3.add(TALB(encoding=Encoding.UTF8, text=album_element.attrib['name']))
+        id3.add(TDRC(encoding=Encoding.UTF8, text=album_element.attrib['year']))
         id3.save()
 
         # stop after X tracks (to save time while debugging)
@@ -216,7 +238,7 @@ def main():
         tracklist = parse_tracklist(tl_path)
         create_album_xml(tracklist)
     else:
-        split_album(al_path)
+        split_mp3(al_path)
 
 if __name__ == '__main__':
     main()
