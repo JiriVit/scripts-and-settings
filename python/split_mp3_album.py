@@ -16,8 +16,6 @@ Recommended YouTube to MP3 Converter:
 y2mate.com
 """
 
-#TODO Add support for cover art.
-
 import glob
 import os
 import re
@@ -119,6 +117,7 @@ def create_album_xml(tracklist):
         'name': '',
         'artist': '',
         'year': '',
+        'cover': '',
     }
 
     # find out if all track have same artist or no artist
@@ -140,6 +139,12 @@ def create_album_xml(tracklist):
         album_attrib['artist'] = tk0['artist']
     elif not no_artist:
         album_attrib['artist'] = 'VA'
+
+    # detect a cover
+    files = os.listdir('.')
+    files = [f for f in files if f.endswith('.jpg')]
+    if len(files) > 0:
+        album_attrib['cover'] = files[0]
 
     # create XML tree
     album_element = ET.Element('album', attrib=album_attrib)
@@ -176,6 +181,14 @@ def split_mp3(mp3_path):
     # load album XML
     tree = ET.parse('album.xml')
     album_element = tree.getroot()
+    
+    # load cover image
+    img = album_element.attrib['cover']
+    if os.path.isfile(img):
+        with open(img, 'rb') as fobj:
+            img = fobj.read()
+    else:
+        img = None
 
     # iterate through tracklist
     track_count = len(album_element)
@@ -222,6 +235,8 @@ def split_mp3(mp3_path):
         id3.add(TPE2(encoding=Encoding.UTF8, text=album_element.attrib['artist']))
         id3.add(TALB(encoding=Encoding.UTF8, text=album_element.attrib['name']))
         id3.add(TDRC(encoding=Encoding.UTF8, text=album_element.attrib['year']))
+        if img is not None:
+            id3.add(APIC(mime='image/jpeg', type=PictureType.COVER_FRONT, data=img))
         id3.save()
 
         # stop after X tracks (to save time while debugging)
