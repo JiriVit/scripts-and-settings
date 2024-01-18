@@ -16,6 +16,8 @@ Recommended YouTube to MP3 Converter:
 y2mate.com
 """
 
+#TODO Add fault isolation for tracklist parsing. Print the specific track which couldn't be parsed.
+
 import glob
 import os
 import re
@@ -32,7 +34,7 @@ from mutagen.mp3 import MP3
 
 # debug options
 SKIP_EXISTING_TRACKS = False
-STOP_AFTER_X_TRACKS = 1
+STOP_AFTER_X_TRACKS = None
 
 TRACK_FORMATS = [
     ('00:00 Title', r'([\d:]+)\s+(.+)', ['start_time', 'title']),
@@ -53,14 +55,12 @@ def get_input_filenames():
         mp3_list = glob.glob('*.mp3')
         if len(mp3_list) > 0:
             album_mp3_path = mp3_list[0]
-            print(f"WARNING: No MP3 file specified, using '{album_mp3_path}'.")
         else:
             print('ERROR: No MP3 file specified, none found.')
             sys.exit(1)
         txt_list = glob.glob('*.txt')
         if len(txt_list) > 0:
             tracklist_path = txt_list[0]
-            print(f"WARNING: No tracklist specified, using '{tracklist_path}'")
         else:
             print('ERROR: No tracklist specified, none found.')
             sys.exit(1)
@@ -82,7 +82,7 @@ def parse_tracklist(path):
     for i in range(trfl_len):
         trf = TRACK_FORMATS[i]
         print(f'{i + 1}:   {trf[0]}')
-    ans = int(input('Select format (1-4): '))
+    ans = int(input(f'\nSelect format (1-{trfl_len}): '))
     selected_trf = TRACK_FORMATS[int(ans) - 1]
 
     # parse the line with a regex, to get track info
@@ -98,9 +98,9 @@ def parse_tracklist(path):
         tracklist.append(track_info)
 
     # ask for confirmation of parsed tracklist
-    print("Tracklist has been parsed to following items:")
+    print('\nTracklist has been parsed to following items:')
     print('\n'.join([str(x) for x in tracklist]))
-    ans = input("Please confirm [Y/n]:")
+    ans = input('\nPlease confirm [Y/n]:')
     if ans.lower() == 'n':
         sys.exit(0)
     
@@ -166,6 +166,8 @@ def create_album_xml(tracklist):
 
     # write the XML tree to a file
     tree.write('album.xml', encoding='utf-8', xml_declaration=True)
+    print('\nTracklist has been converted to file album.xml.')
+    print('Please review the file and run the script again to split the MP3.')
 
 
 def split_mp3(mp3_path):
