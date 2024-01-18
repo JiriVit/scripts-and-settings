@@ -109,23 +109,75 @@ def parse_tracklist(path):
     return tracklist
 
 
-def split_album(path, tracklist):
+def create_album_xml(tracklist):
+    album_attrib = {
+        'name': '',
+        'artist': '',
+        'year': '',
+        'album_artist': '',
+    }
 
-    # load the album MP3
-    album_stream = ffmpeg.input(path).audio
+    # find out if all track have same artist or no artist
+    tk0 = tracklist[0]
+    no_artist = True
+    same_artist = True
+    for trk in tracklist:
+        if 'artist' in tk0:
+            no_artist = False
+            if 'artist' in trk:
+                if tk0['artist'] != trk['artist']:
+                    same_artist = False
+                    break
+            else:
+                same_artist = False
+                break
+
+    if same_artist:
+        album_attrib.pop('artist')
+        album_attrib['album_artist'] = tk0['artist']
+
+    # create XML tree
+    album_element = ET.Element('album', attrib=album_attrib)
+    for trk in tracklist:        
+        attrib = {
+            'start_time': trk['start_time']
+        }
+        if no_artist:
+            attrib['artist'] = '%album%'
+        elif 'artist' in trk:
+            attrib['artist'] = trk['artist']
+        else:
+            attrib['artist'] = ''
+        attrib['title'] = trk['title']
+        ET.SubElement(album_element, 'track', attrib=attrib)
+    tree = ET.ElementTree(album_element)
+    ET.indent(tree)
+
+    # write the XML tree to a file
+    tree.write('album.xml', encoding='utf-8', xml_declaration=True)
+
+
+def split_album(mp3_path):
+
+    # load album MP3
+    album_stream = ffmpeg.input(mp3_path).audio
+
+    # load album XML
+    tree = ET.parse('album.xml')
+    album_element = tree.getroot()
 
     # iterate through tracklist
-    track_count = len(tracklist)
-    for i, track_info in enumerate(tracklist):
+    track_count = len(album_element)
+    for i, track_element in enumerate(album_element):
 
         # get data fields from track info
         track_number = i + 1
-        track_start = track_info["start_time"]
+        track_start = track_element.attrib['start_time']
         if i < (track_count - 1):
-            track_end = tracklist[i + 1]["start_time"]
+            track_end = album_element[i + 1].attrib['start_time']
         else:
             track_end = None
-        track_title = track_info["title"]
+        track_title = track_element.attrib['title']
 
         # TODO Use bitrate of the input file. We now set the bitrate explicitly, because it
         #      was reduced from original 160k to 128k, for some reason.
@@ -146,8 +198,8 @@ def split_album(path, tracklist):
         id3 = EasyID3(track_path)
         id3["tracknumber"] = f"{track_number:02d}"
         id3["title"] = track_title
-        if 'artist' in track_info:
-            id3['artist'] = track_info['artist']
+        if 'artist' in track_element.attrib:
+            id3['artist'] = track_element.attrib['artist']
         id3.save()
 
         # stop after X tracks (to save time while debugging)
@@ -160,8 +212,11 @@ def split_album(path, tracklist):
 
 def main():
     (al_path, tl_path) = get_input_filenames()
-    tracklist = parse_tracklist(tl_path)
-    split_album(al_path, tracklist)
+    if not os.path.isfile('album.xml'):
+        tracklist = parse_tracklist(tl_path)
+        create_album_xml(tracklist)
+    else:
+        split_album(al_path)
 
 if __name__ == '__main__':
     main()
