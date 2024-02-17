@@ -15,7 +15,6 @@ options  Options for the action. Supported values:
          - compilation: treat the files as an compilation with multiple artists
 """
 
-# TODO Add support for romaji.
 # TODO Add support for choice between album and compilation.
 # TODO Add restriction for transcription only if the whole string is in that language.
 # TODO Add auto detection of language.
@@ -28,6 +27,7 @@ from enum import Flag
 
 # 3rd party libraries
 from pinyin_jyutping import PinyinJyutping
+from pykakasi import kakasi
 from mutagen.id3 import Encoding, PictureType, ID3, APIC, TALB, TDRC, TIT2, TPE1, TPE2, TRCK
 from mutagen.mp3 import MP3
 
@@ -198,6 +198,7 @@ class AlbumInfo:
     """Encapsulates data of a MP3 album."""
 
     pj = None
+    kks = None
 
     def __init__(self, path='.', options=Options.NONE):
         self.path = path
@@ -287,6 +288,7 @@ class AlbumInfo:
             year = ''
 
         filename = f'!{artist}{trk0.album}{year}.m3u8'
+        filename = filename.replace('|', '-')
 
         with open(filename, 'wt', encoding='utf_8_sig') as fobj:
             fobj.write('#EXTM3U\n')
@@ -387,7 +389,18 @@ class AlbumInfo:
                 romanization = ''.join(romanization).capitalize()
             except:
                 print(f'ERROR: Romanization failed for string \'{text}\'')
+        
+        elif self.options & Options.ROMAJI:
 
+            if AlbumInfo.kks is None:
+                AlbumInfo.kks = kakasi()
+
+            try:
+                romanization = AlbumInfo.kks.convert(text)                
+                romanization = [x['hepburn'] for x in romanization]
+                romanization = ' '.join(romanization).capitalize()
+            except:
+                print(f'ERROR: Romanization failed for string \'{text}\'')
 
         if preserve_original and (romanization != text):
             romanization = f'{romanization} ({text})'
@@ -435,27 +448,7 @@ class AlbumInfo:
 
 
 def debug():
-    tags = ID3('sample.mp3')
-    tags.delall('APIC')
-    print(tags.pprint() + '\n')
-
-    with open('cover1.jpg', 'rb') as fobj:
-        pict_data = fobj.read()
-
-    pict1 = APIC(mime='image/jpeg', type=PictureType.COVER_FRONT, data=pict_data, desc='1')
-    tags.add(pict1)
-    print(tags.pprint() + '\n')
-
-    with open('cover2.jpg', 'rb') as fobj:
-        pict_data = fobj.read()
-
-    pict2 = APIC(mime='image/jpeg', type=PictureType.COVER_BACK, data=pict_data, desc='2')
-    tags.add(pict2)
-    print(tags.pprint() + '\n')
-
-    print(tags.keys())
-
-    tags.save()
+    pass
 
 
 def main():
@@ -468,6 +461,7 @@ def main():
             supported_options = {
                 'pinyin': Options.PINYIN,
                 'jyutping': Options.JYUTPING,
+                'romaji': Options.ROMAJI,
                 'album': Options.ALBUM,
                 'compilation': Options.COMPILATION
             }
