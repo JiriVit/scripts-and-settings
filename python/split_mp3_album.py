@@ -40,6 +40,7 @@ TRACK_FORMATS = [
     ('00:00 Title', r'([\d:]+)\s+(.+)', ['start_time', 'title']),
     ('[00:00] Title', r'\[([\d:]+)\]\s+(.+)', ['start_time', 'title']),
     ('00.Title [00:00]', r'\d+\.(.+)\s+\[([\d:]+)\]', ['title', 'start_time']),
+    ('00. Title 00:00', r'\d+\.\s([^:]+)\s([\d:]+)', ['title', 'start_time']),
     ('00:00 Artist - Title', r'([\d:]+)\s+(.+)\s-\s(.+)', ['start_time', 'artist', 'title']),
 ]
 
@@ -92,13 +93,14 @@ def parse_tracklist(path):
     tracklist = []
     for line in lines:
         match = regex.match(line)
-        track_info = {}
-        for i in range(len(trf_fields)):
-            track_info[trf_fields[i]] = match.group(i+1)
-        tracklist.append(track_info)
+        if match is not None:
+            track_info = {}
+            for i in range(len(trf_fields)):
+                track_info[trf_fields[i]] = match.group(i + 1)
+            tracklist.append(track_info)
 
     # ask for confirmation of parsed tracklist
-    print('\nTracklist has been parsed to following items:')
+    print(f'\nTracklist has been parsed to following {len(tracklist)} items:')
     print('\n'.join([str(x) for x in tracklist]))
     ans = input('\nPlease confirm [Y/n]:')
     if ans.lower() == 'n':
@@ -136,7 +138,7 @@ def create_album_xml(tracklist):
                 same_artist = False
                 break
 
-    if same_artist:
+    if same_artist and not no_artist:
         album_attrib['artist'] = tk0['artist']
     elif not no_artist:
         album_attrib['artist'] = 'VA'
