@@ -151,7 +151,7 @@ class TrackInfo:
         self.__set_tag('TPE2', self.album_artist)
         self.__set_tag('TALB', self.album)
         self.__set_tag('TDRC', self.year)
-        self.tags.save(v2_version=3)
+        self.tags.save(v2_version=4)
 
 
     def rename(self, options):
@@ -267,11 +267,17 @@ class AlbumInfo:
         """Renames the MP3 files per their ID3 tags."""
 
         if self.options & (Options.ALBUM | Options.COMPILATION):
-            for track_info in self.track_list:
-                track_info.rename(self.options)
+            # renaming option has been given in an argument            
+            options = self.options
         else:
-            print("ERROR: Missing option 'album' / 'compilation'.")
-            print(__doc__)
+            # renaming option to be derived from track parameters
+            if self.same_artist:
+                options = Options.ALBUM
+            else:
+                options = Options.COMPILATION
+        
+        for track_info in self.track_list:
+            track_info.rename(options)
 
 
     def create_playlist(self):
@@ -452,27 +458,39 @@ def debug():
 
 
 def main():
+    action = None
+    options = Options.NONE
+
+    # first argument is action 
     if len(sys.argv) > 1:
         action = sys.argv[1]
+    
+    # the next arguments after action are options
+    if len(sys.argv) > 2:
+        supported_options = {
+            'pinyin': Options.PINYIN,
+            'jyutping': Options.JYUTPING,
+            'romaji': Options.ROMAJI,
+            'album': Options.ALBUM,
+            'compilation': Options.COMPILATION
+        }
 
-        # parse options
-        options = Options.NONE
-        if len(sys.argv) > 2:
-            supported_options = {
-                'pinyin': Options.PINYIN,
-                'jyutping': Options.JYUTPING,
-                'romaji': Options.ROMAJI,
-                'album': Options.ALBUM,
-                'compilation': Options.COMPILATION
-            }
+        for i in range(2, len(sys.argv)):
+            opt = sys.argv[i]
+            if opt in supported_options:
+                options = options | supported_options[opt]
 
-            for i in range(2, len(sys.argv)):
-                opt = sys.argv[i]
-                if opt in supported_options:
-                    options = options | supported_options[opt]
-        
-        album_info = AlbumInfo('.', options)
-        
+    album_info = AlbumInfo('.', options)
+
+    if action is None:
+        if not os.path.isfile('album.xml'):
+            album_info.export_to_xml()
+        else:
+            # TODO Request confirmation
+            album_info.import_from_xml()
+            album_info.rename_files()
+            album_info.create_playlist()
+    else:
         supported_actions = {
             'export': album_info.export_to_xml,
             'import': album_info.import_from_xml,
@@ -487,8 +505,6 @@ def main():
         else:
             print('ERROR: Action not supported')
             print(__doc__)
-    else:
-        print(__doc__)
 
 
 #---------------------------------------------------------------------------------------------------
