@@ -496,6 +496,7 @@ def main():
             'import': album_info.import_from_xml,
             'rename': album_info.rename_files,
             'playlist': album_info.create_playlist,
+            'pl': album_info.create_playlist,
             'debug': debug
         }
 
