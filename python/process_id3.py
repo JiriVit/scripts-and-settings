@@ -30,6 +30,7 @@ from pinyin_jyutping import PinyinJyutping
 from pykakasi import kakasi
 from mutagen.id3 import Encoding, PictureType, ID3, APIC, TALB, TDRC, TIT2, TPE1, TPE2, TRCK
 from mutagen.mp3 import MP3
+import pathvalidate
 
 #---------------------------------------------------------------------------------------------------
 # Constants
@@ -294,7 +295,7 @@ class AlbumInfo:
             year = ''
 
         filename = f'!{artist}{trk0.album}{year}.m3u8'
-        filename = filename.replace('|', '-')
+        filename = pathvalidate.sanitize_filename(filename)
 
         with open(filename, 'wt', encoding='utf_8_sig') as fobj:
             fobj.write('#EXTM3U\n')
