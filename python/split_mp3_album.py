@@ -37,11 +37,13 @@ SKIP_EXISTING_TRACKS = False
 STOP_AFTER_X_TRACKS = None
 
 TRACK_FORMATS = [
-    ('00:00 Title', r'([\d:]+)\s+(.+)', ['start_time', 'title']),
-    ('[00:00] Title', r'\[([\d:]+)\]\s+(.+)', ['start_time', 'title']),
-    ('00.Title [00:00]', r'\d+\.(.+)\s+\[([\d:]+)\]', ['title', 'start_time']),
-    ('00. Title 00:00', r'\d+\.\s([^:]+)\s([\d:]+)', ['title', 'start_time']),
-    ('00:00 Artist - Title', r'([\d:]+)\s+(.+)\s-\s(.+)', ['start_time', 'artist', 'title']),
+    ('00:00 Title',            r'([\d:]+)\s+(.+)',              ['start_time', 'title']),
+    ('[00:00] Title',          r'\[([\d:]+)\]\s+(.+)',          ['start_time', 'title']),
+    ('00.Title [00:00]',       r'\d+\.(.+)\s+\[([\d:]+)\]',     ['title', 'start_time']),
+    ('00. Title 00:00',        r'\d+\.\s([^:]+)\s([\d:]+)',     ['title', 'start_time']),
+    ('00:00 Artist - Title',   r'([\d:]+)\s+(.+)\s-\s(.+)',     ['start_time', 'artist', 'title']),
+    ('[00:00] Artist - Title', r'\[([\d:]+)\]\s+(.+)\s-\s(.+)', ['start_time', 'artist', 'title']),
+    ('00. [00:00] - Title',    r'\d+\.\s\[([\d:]+)\]\s-\s(.+)', ['start_time', 'title']),
 ]
 
 #---------------------------------------------------------------------------------------------------
