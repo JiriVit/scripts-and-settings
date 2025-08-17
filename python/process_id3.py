@@ -21,6 +21,7 @@ options  Options for the action. Supported values:
 # TODO Fix building of playlist name with characters not supported in Windows filenames.
 
 import os
+import re
 import sys
 import xml.etree.cElementTree as ET
 from enum import Flag
@@ -36,6 +37,7 @@ import pathvalidate
 # Constants
 #---------------------------------------------------------------------------------------------------
 
+# TODO Put this to an external file
 ROMANIZATION_DICT = {
     '鳳飛飛': 'Fong Fei-Fei',
     '汪明荃': 'Liza Wang',
@@ -80,6 +82,9 @@ class Options(Flag):
 
     COMPILATION = 0x20
     """Treats the album as compilation with multiple artists."""
+    
+    SWAP_TRANSCRIPTION_POSITION = 0x40
+    """Swaps position of Asian text and its transcription, eg. A (B) to B (A)."""
 
 
 class TrackInfo:
@@ -226,6 +231,8 @@ class AlbumInfo:
         album_element = ET.Element('album', attrib=self.album_attrib)
         for track_info in self.track_list:
             track_info.title = self.__add_romanization(track_info.title)
+            if (self.options & Options.SWAP_TRANSCRIPTION_POSITION):
+                track_info.title = self.__swap_romanization(track_info.title)
             track_info.artist = self.__add_romanization(track_info.artist, preserve_original=False, lookup=True)
             track_info.create_xml_element(album_element, 
                                           export_artist = not self.same_artist, 
@@ -410,9 +417,24 @@ class AlbumInfo:
                 print(f'ERROR: Romanization failed for string \'{text}\'')
 
         if preserve_original and (romanization != text):
-            romanization = f'{romanization} ({text})'
+            romanization = f'{text} ({romanization})'
 
         return romanization
+
+
+    def __swap_romanization(self, text):
+        
+        processed_text = text
+
+        # extract the parts of the text "before part (inside part)"
+        pattern = r"^(.*?)\s*\((.*?)\)$"
+        match = re.match(pattern, text)
+        if match:
+            before = match.group(1).strip()
+            inside = match.group(2).strip()
+            processed_text = f'{inside} ({before})'
+
+        return processed_text
 
 
     def __check_same_tags(self):
@@ -473,7 +495,8 @@ def main():
             'jyutping': Options.JYUTPING,
             'romaji': Options.ROMAJI,
             'album': Options.ALBUM,
-            'compilation': Options.COMPILATION
+            'compilation': Options.COMPILATION,
+            'swap': Options.SWAP_TRANSCRIPTION_POSITION,
         }
 
         for i in range(2, len(sys.argv)):
@@ -493,12 +516,15 @@ def main():
             album_info.create_playlist()
     else:
         supported_actions = {
-            'export': album_info.export_to_xml,
-            'import': album_info.import_from_xml,
-            'rename': album_info.rename_files,
+            'export':   album_info.export_to_xml,
+            'e':        album_info.export_to_xml,
+            'import':   album_info.import_from_xml,
+            'i':        album_info.import_from_xml,
+            'rename':   album_info.rename_files,
+            'r':        album_info.rename_files,
             'playlist': album_info.create_playlist,
-            'pl': album_info.create_playlist,
-            'debug': debug
+            'pl':       album_info.create_playlist,
+            'debug':    debug
         }
 
         # perform the action
