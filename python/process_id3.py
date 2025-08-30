@@ -86,6 +86,8 @@ class Options(Flag):
     SWAP_TRANSCRIPTION_POSITION = 0x40
     """Swaps position of Asian text and its transcription, eg. A (B) to B (A)."""
 
+    KEEP_ENGLISH = 0x80
+    """Keeps English translation of Asian title, result will be E (A) [R]."""
 
 class TrackInfo:
     """Encapsulates ID3 tags of a MP3 file and provides methods to work with them."""
@@ -386,8 +388,17 @@ class AlbumInfo:
 
         romanization = text
 
-        if lookup and (text in ROMANIZATION_DICT):
-            romanization = ROMANIZATION_DICT[text]
+        if preserve_original and self.options & Options.KEEP_ENGLISH:
+            pattern = r"^(.*?)\s*\((.*?)\)$"
+            match = re.match(pattern, text)
+            if match:
+                english = match.group(1).strip()
+                asian = match.group(2).strip()
+        else:
+            asian = text
+
+        if lookup and (asian in ROMANIZATION_DICT):
+            romanization = ROMANIZATION_DICT[asian]
         elif self.options & (Options.PINYIN | Options.JYUTPING):
 
             # this instance is quite expensive, so we create it once and reuse it
@@ -396,13 +407,13 @@ class AlbumInfo:
 
             try:
                 if self.options & Options.PINYIN:
-                    romanization = AlbumInfo.pj.pinyin(text, tone_numbers=True)
+                    romanization = AlbumInfo.pj.pinyin(asian, tone_numbers=True)
                 else:
-                    romanization = AlbumInfo.pj.jyutping(text, tone_numbers=True)
+                    romanization = AlbumInfo.pj.jyutping(asian, tone_numbers=True)
                 romanization = [x for x in romanization if not x.isdigit()]
                 romanization = ''.join(romanization).capitalize()
             except:
-                print(f'ERROR: Romanization failed for string \'{text}\'')
+                print(f'ERROR: Romanization failed for string \'{asian}\'')
         
         elif self.options & Options.ROMAJI:
 
@@ -410,14 +421,17 @@ class AlbumInfo:
                 AlbumInfo.kks = kakasi()
 
             try:
-                romanization = AlbumInfo.kks.convert(text)                
+                romanization = AlbumInfo.kks.convert(asian)                
                 romanization = [x['hepburn'] for x in romanization]
                 romanization = ' '.join(romanization).capitalize()
             except:
-                print(f'ERROR: Romanization failed for string \'{text}\'')
+                print(f'ERROR: Romanization failed for string \'{asian}\'')
 
-        if preserve_original and (romanization != text):
-            romanization = f'{text} ({romanization})'
+        if preserve_original and (romanization != asian):
+            if self.options & Options.KEEP_ENGLISH:
+                romanization = f'{english} ({asian}) [{romanization}]'
+            else:
+                romanization = f'{asian} ({romanization})'
 
         return romanization
 
@@ -497,6 +511,7 @@ def main():
             'album': Options.ALBUM,
             'compilation': Options.COMPILATION,
             'swap': Options.SWAP_TRANSCRIPTION_POSITION,
+            'keepeng': Options.KEEP_ENGLISH,
         }
 
         for i in range(2, len(sys.argv)):
