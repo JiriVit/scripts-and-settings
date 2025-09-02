@@ -18,7 +18,10 @@ options  Options for the action. Supported values:
 # TODO Add support for choice between album and compilation.
 # TODO Add restriction for transcription only if the whole string is in that language.
 # TODO Add auto detection of language.
-# TODO Fix building of playlist name with characters not supported in Windows filenames.
+# TODO Create classes for actions and options to automate their listing in help.
+# TODO Group some actions so they can be done at once.
+# TODO Fix crash for missing ID3 tags.
+# TODO Add actions which skip the XML file and are done purely on ID3 tags.
 
 import os
 import re
@@ -60,6 +63,14 @@ ROMANIZATION_DICT = {
 #---------------------------------------------------------------------------------------------------
 # Classes
 #---------------------------------------------------------------------------------------------------
+
+class Action:
+
+    def __init__(self, name, shortcut, description, action_function):
+        self.name = name
+        self.shortcut = shortcut
+        self.description = description
+        self.action_function = action_function
 
 
 class Options(Flag):
