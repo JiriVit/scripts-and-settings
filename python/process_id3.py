@@ -23,6 +23,10 @@ options  Options for the action. Supported values:
 # TODO Fix crash for missing ID3 tags.
 # TODO Add actions which skip the XML file and are done purely on ID3 tags.
 
+# Use Case 'Teresa Teng':
+# 1. No album.xml -> we want to export.
+# 2. No ID3 tags -> we import them from file names.
+
 import os
 import re
 import sys
